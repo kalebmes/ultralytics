@@ -5,6 +5,7 @@ import shutil
 import socket
 import sys
 import tempfile
+import torch
 
 from . import USER_CONFIG_DIR
 
@@ -46,12 +47,14 @@ def generate_ddp_file(trainer):
 
 def generate_ddp_command(world_size, trainer):
     import __main__  # noqa local import to avoid https://github.com/Lightning-AI/lightning/issues/15218
+    # since torch.distributed.run is not supported before pytorch 1.9.0, change 'run' to 'launch' if one is using pytorch versions from 1.7.0 to 1.9.0
+    run_or_launch = 'launch' if torch.version.__version__ < "1.9.0" else 'run'
     file_name = os.path.abspath(sys.argv[0])
     using_cli = not file_name.endswith(".py")
     if using_cli:
         file_name = generate_ddp_file(trainer)
     return [
-        sys.executable, "-m", "torch.distributed.run", "--nproc_per_node", f"{world_size}", "--master_port",
+        sys.executable, "-m", f"torch.distributed.{run_or_launch}", "--nproc_per_node", f"{world_size}", "--master_port",
         f"{find_free_network_port()}", file_name] + sys.argv[1:]
 
 
